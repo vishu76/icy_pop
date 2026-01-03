@@ -297,7 +297,7 @@ class _SelfieCapturePageState extends State<SelfieCapturePage> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                elevation: 5,
+                                
                               ),
                               child: Text(
                                 'Take Selfie',
@@ -318,7 +318,7 @@ class _SelfieCapturePageState extends State<SelfieCapturePage> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                elevation: 5,
+                                
                               ),
                               child: Text(
                                 'Retake',
@@ -338,7 +338,7 @@ class _SelfieCapturePageState extends State<SelfieCapturePage> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              elevation: 5,
+                              
                             ),
                             child: Text(
                               'Submit',

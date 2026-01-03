@@ -54,9 +54,11 @@ enum API {
   wheelCartIn,
   wheelCartLiveLocation,
   dashboard,
+  sendOtpEndpoint,
   viewRequest,
   approveRequest,
   acceptedCartQuantity,
+  captainlogout,
   returnCartQuantity,
 
   // Other APIs as required...
@@ -79,10 +81,13 @@ class APIManager {
         apiPathString = "wheelcartmaster/mob-wheel-cart-order-list";
         break;
       case API.wheelCartOutOrderDetail:
-        apiPathString = "wheelcartmaster/wheel-cart-out-order-detail";
+        apiPathString = "wheelcartmaster/captain-ecart-out-order-detail";
         break;
       case API.wheelCartIn:
-        apiPathString = "wheelcartmaster/wheel-cart-in";
+        apiPathString = "wheelcartmaster/captain-ecart-in";
+        break;
+      case API.captainlogout:
+        apiPathString = "adminmaster/captain-logout";
         break;
       case API.wheelCartLiveLocation:
         apiPathString = "wheelcartmaster/add-wheel-cart-location";
@@ -90,20 +95,23 @@ class APIManager {
       case API.todayswheelcartdetail:
         apiPathString = "wheelcartmaster/todays-wheel-cart-detail";
         break;
+      case API.sendOtpEndpoint:
+        apiPathString = "adminmaster/captain-login-send-otp";
+        break;
       case API.dashboard:
         apiPathString = "wheelcartmaster/wheel-cart-dashboard";
         break;
       case API.viewRequest:
-        apiPathString = "wheelcartmaster/mob-wheel-cart-order-returned-list";
+        apiPathString = "wheelcartmaster/captain-ecart-order-returned-list";
         break;
       case API.approveRequest:
-        apiPathString = "wheelcartmaster/approve-cart-load-status";
+        apiPathString = "wheelcartmaster/captain-approve-cart-load-status";
         break;
         case API.returnCartQuantity:
-        apiPathString = "wheelcartmaster/ReturnCartQuantity";
+        apiPathString = "wheelcartmaster/captain-return-cart-quantity";
         break;
         case API.acceptedCartQuantity:
-        apiPathString = "wheelcartmaster/AcceptedCartQuantity";
+        apiPathString = "wheelcartmaster/captain-accept-cart-qty";
         break;
       default:
         apiPathString = "HomeheaderResponse";
@@ -125,6 +133,8 @@ class APIManager {
       case API.wheelCartLiveLocation:
       case API.dashboard:
       case API.viewRequest:
+      case API.captainlogout:
+      case API.sendOtpEndpoint:
       case API.approveRequest:
         return HTTPMethod.POST;
       default:

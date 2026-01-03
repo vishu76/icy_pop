@@ -20,7 +20,7 @@
 
 
     <application
-        android:label="ice_cream"
+        android:label="Icy Popps"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

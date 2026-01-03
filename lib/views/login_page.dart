@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
-
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ice_cream/utils/color.dart';
+import 'package:pinput/pinput.dart';
 import '../controllers/login_controller.dart';
-import 'Selfie_Capture_Page.dart'; // Import the selfie capture page
+import 'Selfie_Capture_Page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -19,10 +20,13 @@ class _LoginPageState extends State<LoginPage>
     with SingleTickerProviderStateMixin {
   final LoginController _loginController = Get.put(LoginController());
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  bool _obscurePassword = true;
-  File? _selfieImage; // Store the captured selfie
+  final TextEditingController _mobileController = TextEditingController();
+  File? _selfieImage;
+  String _lastSentMobile = ''; // Track the last mobile number OTP was sent to
+
+  // For OTP auto-fill
+  final FocusNode _otpFocusNode = FocusNode();
+  bool _isOtpSent = false;
 
   late AnimationController _animationController;
   late Animation<Offset> _slideAnimation;
@@ -51,20 +55,28 @@ class _LoginPageState extends State<LoginPage>
     ).animate(_animationController);
 
     _animationController.forward();
+
+    // Listen to OTP changes for auto-submit
+    _loginController.otp.listen((otp) {
+      if (otp.length == 6 && _isOtpSent) {
+        // Auto-submit after 500ms
+        Future.delayed(Duration(milliseconds: 500), () {
+          _submitLogin();
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _animationController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
+    _mobileController.dispose();
+    _otpFocusNode.dispose();
     super.dispose();
   }
 
-  // Function to open selfie capture page and get the result
   Future<void> _takeSelfie() async {
     final result = await Get.to<File?>(() => SelfieCapturePage());
-
     if (result != null) {
       setState(() {
         _selfieImage = result;
@@ -72,18 +84,88 @@ class _LoginPageState extends State<LoginPage>
     }
   }
 
+  void _submitLogin() {
+    if (_formKey.currentState!.validate()) {
+      if (_selfieImage == null) {
+        Get.snackbar(
+          'Error',
+          'Please take a selfie first',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      if (!_isOtpSent) {
+        Get.snackbar(
+          'Error',
+          'Please send OTP first',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      if (_loginController.otp.value.length != 6) {
+        Get.snackbar(
+          'Error',
+          'Please enter 6-digit OTP',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      final imageBytes = _selfieImage!.readAsBytesSync();
+      final base64Image = base64Encode(imageBytes);
+      _loginController.login(
+        _mobileController.text,
+        _loginController.otp.value,
+        base64Image,
+      );
+    }
+  }
+
+  void _sendOtp() {
+    if (_mobileController.text.isEmpty ||
+        _mobileController.text.length != 10 ||
+        !GetUtils.isPhoneNumber(_mobileController.text)) {
+      Get.snackbar(
+        'Error',
+        'Please enter a valid 10-digit mobile number',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    _loginController.sendOtp();
+    setState(() {
+      _isOtpSent = true;
+      _lastSentMobile = _mobileController.text; // Store the mobile number
+    });
+    _otpFocusNode.requestFocus();
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.pink[50],
+      backgroundColor: Colors.pink.shade200 ,
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Card(
-              elevation: 10,
+              elevation: 0,
+              color: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
+
               ),
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -110,12 +192,12 @@ class _LoginPageState extends State<LoginPage>
                       ),
                       SizedBox(height: 20),
                       Text(
-                          'Login',
-                          style: GoogleFonts.fredoka(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w500,
-                            color: primaryColor,
-                          )
+                        'Login',
+                        style: GoogleFonts.fredoka(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w500,
+                          color: primaryColor,
+                        ),
                       ),
                       SizedBox(height: 20),
 
@@ -161,7 +243,7 @@ class _LoginPageState extends State<LoginPage>
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          elevation: 5,
+                          elevation: 0,
                         ),
                         child: Text(
                           _selfieImage != null ? 'Retake Selfie' : 'Take Selfie',
@@ -173,99 +255,174 @@ class _LoginPageState extends State<LoginPage>
                       ),
                       SizedBox(height: 20),
 
+                      // Mobile Number Field with Send OTP Button at right corner
+                      // Mobile Number Field
                       TextFormField(
-                        controller: _emailController,
+                        controller: _mobileController,
+                        keyboardType: TextInputType.phone,
+                        maxLength: 10,
                         decoration: InputDecoration(
-                          labelText: 'Email',
-                          labelStyle: GoogleFonts.fredoka(color: primaryColor),
-                          prefixIcon: Icon(Icons.email, color: primaryColor),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Email cannot be empty';
-                          }
-                          if (!GetUtils.isEmail(value)) {
-                            return 'Enter a valid email';
-                          }
-                          return null;
-                        },
-                      ),
-                      SizedBox(height: 20),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          labelStyle: GoogleFonts.fredoka(color: primaryColor),
-                          prefixIcon: Icon(Icons.lock, color: primaryColor),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                              color: primaryColor,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Password cannot be empty';
-                          }
-                          return null;
-                        },
-                      ),
-                      SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            if (_selfieImage == null) {
-                              Get.snackbar(
-                                'Error',
-                                'Please take a selfie first',
-                                snackPosition: SnackPosition.BOTTOM,
-                                backgroundColor: Colors.red,
-                                colorText: Colors.white,
+                          hintText: 'Enter mobile number',
+                          hintStyle: TextStyle(color: Colors.grey[600]),
+                          prefixIcon: Icon(Icons.phone, color: primaryColor),
+                          suffixIcon: Obx(() {
+                            bool isEnabled = _loginController.mobileNumber.value.length == 10 &&
+                                !_loginController.isLoading.value &&
+                                _loginController.mobileError.value.isEmpty;
+
+                            // Check if timer is active - disable if countdown > 0
+                            bool isTimerActive = _isOtpSent && _loginController.countdown.value > 0;
+                            bool isTappable = isEnabled && !isTimerActive;
+
+                            // Show loading indicator when sending
+                            if (_loginController.isLoading.value) {
+                              return Padding(
+                                padding: EdgeInsets.only(right: 16),
+                                child: SizedBox(
+                                  width: 10,
+                                  height: 10,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1,
+                                    color: primaryColor,
+                                  ),
+                                ),
                               );
-                              return;
                             }
-                            final imageBytes = _selfieImage!.readAsBytesSync();
-                            final base64Image = base64Encode(imageBytes);
-                            _loginController.login(
-                              _emailController.text,
-                              _passwordController.text,
-                              base64Image, // Pass the selfie image to the controller
+
+                            return Container(
+                              padding: EdgeInsets.only(right: 16),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  GestureDetector(
+                                    onTap: isTappable ? _sendOtp : null,
+                                    child: Text(
+                                      // If mobile number changed, show "Send" instead of timer/resend
+                                      (_isOtpSent && _loginController.countdown.value > 0 &&
+                                          _loginController.mobileNumber.value == _mobileController.text)
+                                          ? '${_loginController.countdown.value}s'
+                                          : (_isOtpSent && _loginController.mobileNumber.value == _mobileController.text
+                                          ? 'Resend'
+                                          : 'Send'),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isTappable ? primaryColor : Colors.grey,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             );
+                          }),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey.shade400),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey.shade400),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.pink, width: 2),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.red),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.red, width: 2),
+                          ),
+                          counterText: '',
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          focusColor: Colors.pink,
+                        ),
+                        cursorColor: Colors.pink,
+                        onChanged: (value) {
+                          _loginController.validateMobile(value);
+
+                          // Reset OTP state if mobile number changes
+                          if (_isOtpSent && _lastSentMobile != value) {
+                            setState(() {
+                              _isOtpSent = false;
+                            });
+                            // Also clear the OTP field
+                            _loginController.clearOtp();
                           }
                         },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Mobile number cannot be empty';
+                          }
+                          if (!GetUtils.isPhoneNumber(value)) {
+                            return 'Enter a valid mobile number';
+                          }
+                          if (value.length != 10) {
+                            return 'Mobile number must be 10 digits';
+                          }
+                          return null;
+                        },
+                      ),
+
+                      SizedBox(height: 20),
+
+                      // OTP Input Field
+                      Text(
+                        'Enter 6-Digit OTP',
+                        style: GoogleFonts.fredoka(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: primaryColor,
+                        ),
+                      ),
+                      SizedBox(height: 12),
+
+                      _buildOtpInput(),
+
+                      SizedBox(height: 8),
+                      Obx(() => Text(
+                        _loginController.otpError.value,
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                        ),
+                      )),
+
+                      SizedBox(height: 25),
+
+                      // Login Button
+                      ElevatedButton(
+                        onPressed: _submitLogin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
                           padding: EdgeInsets.symmetric(horizontal: 50, vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          elevation: 5,
+                          elevation: 0,
                         ),
                         child: Obx(() {
                           return _loginController.isLoading.value
-                              ? CircularProgressIndicator(color: Colors.white)
+                              ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
                               : Text(
-                              'Login',
-                              style: GoogleFonts.fredoka(
-                                fontSize: 18,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                              )
+                            'Login',
+                            style: GoogleFonts.fredoka(
+                              fontSize: 18,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
                           );
                         }),
                       ),
@@ -277,6 +434,54 @@ class _LoginPageState extends State<LoginPage>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildOtpInput() {
+    final defaultPinTheme = PinTheme(
+      width: 45,
+      height: 45,
+      textStyle: GoogleFonts.fredoka(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: primaryColor,
+      ),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade400),
+        borderRadius: BorderRadius.circular(10),
+        color: Colors.white,
+      ),
+    );
+
+    final focusedPinTheme = defaultPinTheme.copyDecorationWith(
+      border: Border.all(color: primaryColor!, width: 2),
+      borderRadius: BorderRadius.circular(10),
+    );
+
+    final submittedPinTheme = defaultPinTheme.copyDecorationWith(
+      border: Border.all(color: primaryColor!, width: 2),
+      borderRadius: BorderRadius.circular(10),
+    );
+
+    return Pinput(
+      length: 6,
+      focusNode: _otpFocusNode,
+      defaultPinTheme: defaultPinTheme,
+      focusedPinTheme: focusedPinTheme,
+      submittedPinTheme: submittedPinTheme,
+      pinputAutovalidateMode: PinputAutovalidateMode.onSubmit,
+      showCursor: true,
+      keyboardType: TextInputType.number,
+      textInputAction: TextInputAction.done,
+      onChanged: (value) {
+        _loginController.updateOtp(value);
+      },
+      onCompleted: (value) {
+        _loginController.updateOtp(value);
+        if (_selfieImage != null && _isOtpSent) {
+          _submitLogin();
+        }
+      },
     );
   }
 }

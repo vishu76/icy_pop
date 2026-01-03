@@ -80,7 +80,7 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               const SizedBox(height: 20),
               Text(
-                'Ice Cream Sales',
+                'Icy Popps',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -89,7 +89,7 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               const SizedBox(height: 10),
               Text(
-                'Sweetening your day, one scoop at a time!',
+                'Bachpan Ki Chuski',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.white70,

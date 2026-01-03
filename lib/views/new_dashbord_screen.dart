@@ -10,6 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:ice_cream/utils/color.dart';
 import 'package:ice_cream/views/login_page.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/api_constants.dart';
 import '../controllers/dashboard_TodaysCartController.dart';
 import '../controllers/dashbord_controller.dart';
 import '../models/CartDataModel.dart';
@@ -41,20 +43,54 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
 
   // Timer for auto-refresh
   Timer? _autoRefreshTimer;
-
+  final RxString userName = ''.obs;
+  final RxString userEmail = ''.obs;
+  final RxString userMobile = ''.obs;
+  final RxString userId = ''.obs;
   @override
   void initState() {
     super.initState();
 
     // Initialize controllers safely
     _initializeControllers();
-
-    _printAuthToken();
-    fetchOrderDetail();
     _dashboardController.startLocationTracking();
+   // _printAuthToken();
+    fetchOrderDetail();
 
+    loadUserData();
     // Start auto-refresh timer
     _startAutoRefresh();
+  }
+
+  Future<void> loadUserData() async {
+    try {
+      final prefs = Get.find<SharedPreferences>();
+      userName.value = prefs.getString('user_name') ?? '';
+      userEmail.value = prefs.getString('user_email') ?? '';
+      userMobile.value = prefs.getString('user_mobile') ?? '';
+      userId.value = prefs.getString('cart_user_id') ?? '';
+
+      print('✅ User data loaded: ${userName.value}, ${userEmail.value}');
+    } catch (e) {
+      print('❌ Error loading user data: $e');
+    }
+  }
+  Future<void> clearUserData() async {
+    try {
+      final prefs = Get.find<SharedPreferences>();
+      await prefs.remove('user_name');
+      await prefs.remove('user_email');
+      await prefs.remove('user_mobile');
+      await prefs.remove('cart_user_id');
+      await prefs.remove('user_data');
+
+      userName.value = '';
+      userEmail.value = '';
+      userMobile.value = '';
+      userId.value = '';
+    } catch (e) {
+      print('❌ Error clearing user data: $e');
+    }
   }
 
   void _startAutoRefresh() {
@@ -62,7 +98,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
     _autoRefreshTimer?.cancel();
 
     // Start new timer that triggers every 1 minute
-    _autoRefreshTimer = Timer.periodic(Duration(minutes: 1), (timer) {
+    _autoRefreshTimer = Timer.periodic(Duration(minutes: 5), (timer) {
       print('[AUTO-REFRESH] Fetching cart details...');
       fetchOrderDetail();
     });
@@ -72,7 +108,6 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
     _autoRefreshTimer?.cancel();
     _autoRefreshTimer = null;
   }
-
 
   void _initializeControllers() {
     // Initialize DashboardController
@@ -119,7 +154,9 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
   }
 
   bool get hasRefillData {
-    return _cartController.cartData.value?.data.refilledProductData.isNotEmpty ?? false;
+    return _cartController
+            .cartData.value?.data.refilledProductData.isNotEmpty ??
+        false;
   }
 
   // Update the products list getter for each section
@@ -156,7 +193,8 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
     final refillProducts = _cartController.refillProducts;
     final returnProducts = _cartController.returnProducts;
 
-    print('[DEBUG] Initializing controllers - Accept: ${acceptProducts.length}, Refill: ${refillProducts.length}, Return: ${returnProducts.length}');
+    print(
+        '[DEBUG] Initializing controllers - Accept: ${acceptProducts.length}, Refill: ${refillProducts.length}, Return: ${returnProducts.length}');
 
     // Pre-fill accept controllers with product quantities
     for (int i = 0; i < acceptProducts.length; i++) {
@@ -174,12 +212,16 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
       ));
     }
 
-    // Pre-fill return controllers with product quantities
+    // Pre-fill return controllers with accepted quantities (not original quantities)
+// Pre-fill return controllers with 0 by default
     for (int i = 0; i < returnProducts.length; i++) {
       final product = returnProducts[i];
       _returnQtyControllers.add(TextEditingController(
-        text: product.quantity.toString(), // Pre-fill with product quantity
+        text: '0', // Default to 0 for return quantities
       ));
+
+      print(
+          '[DEBUG] Return product ${product.productName}: quantity=${product.quantity}, acceptedQuantity=${product.acceptedQuantity}, prefill=0');
     }
   }
 
@@ -216,30 +258,401 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
     }
   }
 
+// Replace your current _logout method with this:
+
   Future<void> _logout() async {
+    // Show confirmation dialog
+    final bool shouldLogout = await Get.dialog<bool>(
+      AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        title: Text(
+          'Logout Confirmation',
+          style: GoogleFonts.fredoka(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to logout?',
+              style: GoogleFonts.fredoka(
+                fontSize: 16,
+                color: Colors.grey[700],
+              ),
+            ),
+
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.fredoka(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+
+          ElevatedButton(
+            onPressed: () => Get.back(result: true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.pink[400],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Logout',
+              style: GoogleFonts.fredoka(
+                fontSize: 16,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!shouldLogout) {
+      return; // User cancelled
+    }
+
     try {
-      await _apiManager.clearToken();
-      await _authService.logout();
-      Get.offAll(() => LoginPage());
+      // Show loading
+      Get.dialog(
+        Center(
+          child: CircularProgressIndicator(
+            color: Colors.pink[400],
+          ),
+        ),
+        barrierDismissible: false,
+      );
+
+      // Get current token
+      final token = await _apiManager.getToken();
+      print('📱 Logout - Current token: ${token?.substring(0, 20)}...');
+
+      if (token != null) {
+        // Call captainlogout API
+        final response = await _apiManager.postRequest(
+          ApiConstants.logoutEndpoint, // Add this to your ApiConstants
+          {'token': token},
+          requiresAuth: true,
+        );
+
+        print('📤 Logout API Response: $response');
+
+        if (response['status'] == 'success') {
+          // Clear local data
+          await _apiManager.clearToken();
+          await _authService.logout();
+
+          // Close loading dialog
+          Get.back();
+
+          // Show success message
+          Get.snackbar(
+            'Success',
+            'Logged out successfully',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+            duration: Duration(seconds: 2),
+          );
+          await clearUserData();
+          // Navigate to login page
+          Future.delayed(Duration(milliseconds: 500), () {
+            Get.offAll(() => LoginPage());
+          });
+        } else {
+          // Close loading dialog
+          Get.back();
+
+          // Show error from API
+          Get.snackbar(
+            'Error',
+            response['msg'] ?? 'Logout failed',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        }
+      } else {
+        // No token found, just clear local data
+        await _apiManager.clearToken();
+        await _authService.logout();
+
+        // Close loading dialog
+        Get.back();
+
+        Get.offAll(() => LoginPage());
+      }
     } catch (e) {
+      print('💥 Logout error: $e');
+
+      // Close loading dialog
+      Get.back();
+
+      // Show error
       Get.snackbar(
         'Error',
         'Failed to logout: $e',
         snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
       );
+
+      // Even if API fails, still try to clear local data
+      try {
+        await _apiManager.clearToken();
+        await _authService.logout();
+        Get.offAll(() => LoginPage());
+      } catch (clearError) {
+        print('💥 Error clearing local data: $clearError');
+      }
     }
   }
 
   Future<void> fetchOrderDetail() async {
     try {
       await _cartController.fetchTodaysCartDetail();
-      // Re-initialize text controllers when data is refreshed
-      if (_cartController.cartData.value != null) {
+
+      // Check if the API response indicates no cart assigned
+      if (_cartController.cartData.value == null ||
+          _cartController.cartData.value?.status == "failed") {
+        _cartController.errorMessage.value = "Cart is not assigned yet!";
+      } else {
+        // Re-initialize text controllers when data is refreshed
         _initializeTextControllers();
         _checkOrderStatus();
       }
     } catch (e) {
       print('Error in fetchOrderDetail: $e');
+      _cartController.errorMessage.value = "Failed to fetch cart details";
+    }
+  }
+
+  bool _validateAcceptCart() {
+    if (acceptProducts.isEmpty) {
+      Get.snackbar(
+        'Validation Error',
+        'No products available to accept',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+
+    bool hasValidQuantity = false;
+    List<String> emptyProducts = [];
+
+    for (int i = 0; i < _acceptQtyControllers.length; i++) {
+      final controller = _acceptQtyControllers[i];
+      final product = acceptProducts[i];
+      final enteredQty = int.tryParse(controller.text) ?? 0;
+
+      if (enteredQty > 0) {
+        hasValidQuantity = true;
+      } else {
+        emptyProducts.add(product.productName);
+      }
+    }
+
+    if (!hasValidQuantity) {
+      Get.snackbar(
+        'Validation Error',
+        'At least one product must have quantity greater than 0',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: Duration(seconds: 3),
+      );
+      return false;
+    }
+
+    // Show warning for products with 0 quantity
+    if (emptyProducts.isNotEmpty) {
+      Get.dialog(
+        AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text('Zero Quantity Products', style: GoogleFonts.fredoka()),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'The following products have 0 quantity:',
+                style: GoogleFonts.fredoka(),
+              ),
+              SizedBox(height: 10),
+              ...emptyProducts
+                  .map((productName) =>
+                      Text('• $productName', style: GoogleFonts.fredoka()))
+                  .toList(),
+              SizedBox(height: 15),
+              Text(
+                'Do you want to continue?',
+                style: GoogleFonts.fredoka(fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: Text('Cancel', style: GoogleFonts.fredoka()),
+            ),
+            ElevatedButton(
+              onPressed: () => Get.back(result: true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.pink[400],
+              ),
+              child: Text('Continue',
+                  style: GoogleFonts.fredoka(color: Colors.white)),
+            ),
+          ],
+        ),
+      ).then((value) {
+        if (value == true) {
+          _submitAcceptCart();
+        }
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  bool _validateRefillCart() {
+    if (refillProducts.isEmpty) {
+      Get.snackbar(
+        'Validation Error',
+        'No products available to refill',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+
+    bool hasValidQuantity = false;
+    List<String> emptyProducts = [];
+
+    for (int i = 0; i < _refillQtyControllers.length; i++) {
+      final controller = _refillQtyControllers[i];
+      final product = refillProducts[i];
+      final enteredQty = int.tryParse(controller.text) ?? 0;
+
+      if (enteredQty > 0) {
+        hasValidQuantity = true;
+      } else {
+        emptyProducts.add(product.productName);
+      }
+    }
+
+    if (!hasValidQuantity) {
+      Get.snackbar(
+        'Validation Error',
+        'At least one product must have quantity greater than 0',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: Duration(seconds: 3),
+      );
+      return false;
+    }
+
+    // Show warning for products with 0 quantity
+    if (emptyProducts.isNotEmpty) {
+      Get.dialog(
+        AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text('Zero Quantity Products', style: GoogleFonts.fredoka()),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'The following products have 0 quantity:',
+                style: GoogleFonts.fredoka(),
+              ),
+              SizedBox(height: 10),
+              ...emptyProducts
+                  .map((productName) =>
+                      Text('• $productName', style: GoogleFonts.fredoka()))
+                  .toList(),
+              SizedBox(height: 15),
+              Text(
+                'Do you want to continue?',
+                style: GoogleFonts.fredoka(fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: Text('Cancel', style: GoogleFonts.fredoka()),
+            ),
+            ElevatedButton(
+              onPressed: () => Get.back(result: true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue[400],
+              ),
+              child: Text('Continue',
+                  style: GoogleFonts.fredoka(color: Colors.white)),
+            ),
+          ],
+        ),
+      ).then((value) {
+        if (value == true) {
+          _submitRefillCart();
+        }
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  void _submitAcceptCart() async {
+    try {
+      List<int> acceptedQuantities = [];
+      for (int i = 0; i < _acceptQtyControllers.length; i++) {
+        final controller = _acceptQtyControllers[i];
+        final enteredQty = int.tryParse(controller.text) ?? 0;
+        acceptedQuantities.add(enteredQty);
+      }
+      await _cartController.submitCartAcceptance(acceptedQuantities);
+  /*    Get.snackbar(
+        'Success',
+        'Cart accepted successfully!',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );*/
+      _isCartAccepted.value = true;
+
+      // Skip refill section if no refill data
+      if (!hasRefillData) {
+        _isRefillCompleted.value = true;
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to accept cart: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
   }
 
@@ -249,7 +662,8 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
       backgroundColor: Colors.white,
       drawer: _buildDrawer(),
       appBar: AppBar(
-        title: Text('IcyPopps',
+        title: Text(
+          'IcyPopps',
           style: GoogleFonts.fredoka(
             fontSize: 22,
             fontWeight: FontWeight.w500,
@@ -279,12 +693,14 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
               print('[PULL-REFRESH] Manual refresh triggered');
               await fetchOrderDetail();
             },
-            builder: (BuildContext context, Widget child, IndicatorController controller) {
+            builder: (BuildContext context, Widget child,
+                IndicatorController controller) {
               return Stack(
                 children: [
                   // Your main content
                   child,
 
+                  // Refresh indicator that responds to drag
                   // Refresh indicator that responds to drag
                   Positioned(
                     top: 0,
@@ -294,44 +710,61 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                       animation: controller,
                       builder: (context, child) {
                         // Calculate opacity and height based on controller value
-                        final double opacity = controller.isLoading ? 1.0 : controller.value.clamp(0.0, 1.0);
-                        final double height = controller.isLoading ? 60.0 : 40.0 * controller.value;
+                        final double opacity = controller.isLoading
+                            ? 1.0
+                            : controller.value.clamp(0.0, 1.0);
+                        final double height = controller.isLoading
+                            ? 60.0
+                            : 40.0 * controller.value;
 
                         return Opacity(
                           opacity: opacity,
                           child: Container(
                             height: height,
-                           // color: Colors.pink[50],
                             child: Center(
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  // Animated spinner
-                                  controller.isLoading
-                                      ? SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.pink[400]!),
+                                  // Animated spinner with white circle background
+                                  Container(
+                                    width: 30,
+                                    height: 30,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black12,
+                                          blurRadius: 4,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
                                     ),
-                                  )
-                                      : Transform.rotate(
-                                    angle: controller.value * 2 * 3.14159, // Rotate based on drag
-                                    child: Icon(
-                                      Icons.refresh,
-                                      color: Colors.pink[400],
-                                      size: 20,
+                                    child: Center(
+                                      child: controller.isLoading
+                                          ? SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                            Color>(
+                                                        Colors.pink[400]!),
+                                              ),
+                                            )
+                                          : Transform.rotate(
+                                              angle: controller.value *
+                                                  2 *
+                                                  3.14159, // Rotate based on drag
+                                              child: Icon(
+                                                Icons.refresh,
+                                                color: Colors.pink[400],
+                                                size: 20,
+                                              ),
+                                            ),
                                     ),
                                   ),
-                             /*     SizedBox(width: 12),
-                                  Text(
-                                    controller.isLoading ? 'Refreshing...' : 'Pull to refresh',
-                                    style: GoogleFonts.fredoka(
-                                      color: Colors.pink[600],
-                                      fontSize: 14,
-                                    ),
-                                  ),*/
                                 ],
                               ),
                             ),
@@ -360,24 +793,28 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-            
+
                   // Quantity Summary Row
                   _buildQuantitySummary(),
-            
+
                   const SizedBox(height: 14),
-            
+
                   // Cart Details Card
                   _buildCartDetails(),
-            
+
                   const SizedBox(height: 14),
-            
+
                   // Main Content Section
                   Obx(() {
                     // Show loading or error states
                     if (_cartController.isLoading.value) {
-                      return const Center(child: CircularProgressIndicator());
+                      return Center(
+                          child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.pink[400],
+                      ));
                     }
-            
+
                     if (_cartController.errorMessage.value.isNotEmpty) {
                       return Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -388,16 +825,17 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                         ),
                       );
                     }
-            
+
                     // Get order status from API
-                    final orderStatus = _cartController.cartData.value?.data.orderproductstatus;
+                    final orderStatus =
+                        _cartController.cartData.value?.data.orderproductstatus;
                     print("Order Status for UI: $orderStatus");
-            
+
                     // Check if cart is returned (status 0)
                     if (orderStatus == "0") {
                       return _buildReturnedCartSection();
                     }
-            
+
                     // Show content based on order status
                     if (orderStatus == "1") {
                       return _buildAcceptSection();
@@ -416,7 +854,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                       }
                     }
                   }),
-            
+
                   const SizedBox(height: 80),
                 ],
               ),
@@ -425,7 +863,8 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
 
           // Floating Button - Only show if order status is not 0
           Obx(() {
-            final orderStatus = _cartController.cartData.value?.data.orderproductstatus;
+            final orderStatus =
+                _cartController.cartData.value?.data.orderproductstatus;
             if (orderStatus == "0") {
               return SizedBox(); // Hide button for returned cart
             }
@@ -445,7 +884,8 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
   Widget _buildFloatingButton() {
     return Obx(() {
       // Get order status from API
-      final orderStatus = _cartController.cartData.value?.data.orderproductstatus;
+      final orderStatus =
+          _cartController.cartData.value?.data.orderproductstatus;
       print("Order Status for Button: $orderStatus");
 
       String buttonText;
@@ -478,24 +918,59 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: _cartController.isLoading.value ? null : () {
-            if (orderStatus == "1") {
-              _handleAcceptCart();
-            } else if (orderStatus == "3") {
-              _handleRefillCart();
-            } else if (orderStatus == "5") {
-              _handleReturnCart();
-            } else {
-              // Fallback: use the original workflow logic
-              if (!_isCartAccepted.value) {
-                _handleAcceptCart();
-              } else if (!_isRefillCompleted.value && hasRefillData) {
-                _handleRefillCart();
-              } else {
-                _handleReturnCart();
-              }
-            }
-          },
+          onPressed: _cartController.isLoading.value
+              ? null
+              : () {
+                  // Validate before proceeding with any action
+                  bool canProceed = false;
+                  String validationType = '';
+
+                  if (orderStatus == "1") {
+                    validationType = 'accept';
+                    canProceed = _validateAcceptCart() &&
+                        _validateQuantitiesNotExceedingMax('accept');
+                    // In the _buildFloatingButton method, update the refill section:
+                  } else if (orderStatus == "3") {
+                    validationType = 'refill';
+                    canProceed = _validateRefillCart() &&
+                        _validateQuantitiesNotExceedingMax('refill');
+                  } else if (orderStatus == "5") {
+                    validationType = 'return';
+                    canProceed = _validateQuantitiesNotExceedingMax('return');
+                  } else {
+                    // Fallback: use the original workflow logic
+                    if (!_isCartAccepted.value) {
+                      validationType = 'accept';
+                      canProceed = _validateAcceptCart() &&
+                          _validateQuantitiesNotExceedingMax('accept');
+                    } else if (!_isRefillCompleted.value && hasRefillData) {
+                      validationType = 'refill';
+                      canProceed = _validateRefillCart() && _validateQuantitiesNotExceedingMax('refill');
+                    } else {
+                      validationType = 'return';
+                      canProceed = _validateQuantitiesNotExceedingMax('return');
+                    }
+                  }
+
+                  if (canProceed) {
+                    if (orderStatus == "1") {
+                      _submitAcceptCart();
+                    } else if (orderStatus == "3") {
+                      _submitRefillCart();
+                    } else if (orderStatus == "5") {
+                      _submitReturnCart();
+                    } else {
+                      // Fallback: use the original workflow logic
+                      if (!_isCartAccepted.value) {
+                        _submitAcceptCart();
+                      } else if (!_isRefillCompleted.value && hasRefillData) {
+                        _submitRefillCart();
+                      } else {
+                        _submitReturnCart();
+                      }
+                    }
+                  }
+                },
           style: ElevatedButton.styleFrom(
             backgroundColor: buttonColor,
             foregroundColor: Colors.white,
@@ -616,14 +1091,14 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                             color: Colors.green[800],
                           ),
                         ),
-                        SizedBox(height: 4),
+                     /*   SizedBox(height: 4),
                         Text(
                           'All operations completed',
                           style: GoogleFonts.fredoka(
                             fontSize: 14,
                             color: Colors.grey[600],
                           ),
-                        ),
+                        ),*/
                       ],
                     ),
                   ),
@@ -670,7 +1145,8 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 12.0, horizontal: 8.0),
                   child: Row(
                     children: [
                       Expanded(
@@ -687,7 +1163,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                       Expanded(
                         flex: 1,
                         child: Text(
-                          'Quantity',
+                          'Accepted Qty',
                           style: GoogleFonts.fredoka(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -717,63 +1193,70 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
               Expanded(
                 child: products.isEmpty
                     ? Center(
-                  child: Text(
-                    'No products available',
-                    style: GoogleFonts.fredoka(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                )
+                        child: Text(
+                          'No products available',
+                          style: GoogleFonts.fredoka(
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      )
                     : ListView.builder(
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    final product = products[index];
-                    return Container(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: index < products.length - 1
-                              ? BorderSide(color: Colors.grey[200]!)
-                              : BorderSide.none,
-                        ),
+                        itemCount: products.length,
+                        itemBuilder: (context, index) {
+                          final product = products[index];
+                          // For return products, show acceptedQuantity instead of quantity
+                          final displayQuantity = product is ReturnProduct
+                              ? (product.acceptedQuantity ?? product.quantity)
+                                  .toString()
+                              : product.quantity.toString();
+
+                          return Container(
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: index < products.length - 1
+                                    ? BorderSide(color: Colors.grey[200]!)
+                                    : BorderSide.none,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10.0, horizontal: 8.0),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: Text(
+                                      product.productName,
+                                      style: GoogleFonts.fredoka(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Text(
+                                      displayQuantity,
+                                      style: GoogleFonts.fredoka(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Icon(
+                                      Icons.check_circle,
+                                      color: Colors.green,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 8.0),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: Text(
-                                product.productName,
-                                style: GoogleFonts.fredoka(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 1,
-                              child: Text(
-                                product.quantity.toString(),
-                                style: GoogleFonts.fredoka(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 1,
-                              child: Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                                size: 18,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
               ),
             ],
           ),
@@ -789,29 +1272,29 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
         children: [
           Expanded(
             child: Obx(() => _buildQuantityContainer(
-              'Total Quantity',
-              _cartController.totalQuantity.value.toString(),
-              Colors.pink[50]!,
-              Colors.pink[800]!,
-            )),
+                  'Total Quantity',
+                  _cartController.totalQuantity.value.toString(),
+                  Colors.pink[50]!,
+                  Colors.pink[800]!,
+                )),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Obx(() => _buildQuantityContainer(
-              'Refill Quantity',
-              _cartController.refillQuantity.value.toString(),
-              Colors.blue[50]!,
-              Colors.blue[800]!,
-            )),
+                  'Refill Quantity',
+                  _cartController.refillQuantity.value.toString(),
+                  Colors.blue[50]!,
+                  Colors.blue[800]!,
+                )),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Obx(() => _buildQuantityContainer(
-              'Return Quantity',
-              _cartController.returnQuantity.value.toString(),
-              Colors.orange[50]!,
-              Colors.orange[800]!,
-            )),
+                  'Return Quantity',
+                  _cartController.returnQuantity.value.toString(),
+                  Colors.orange[50]!,
+                  Colors.orange[800]!,
+                )),
           ),
         ],
       ),
@@ -857,10 +1340,12 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                     ),
                     // Show order status badge
                     Obx(() {
-                      String? orderStatus = _cartController.cartData.value?.data.orderproductstatus;
+                      String? orderStatus = _cartController
+                          .cartData.value?.data.orderproductstatus;
                       if (orderStatus != null) {
                         return Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: _getStatusColor(orderStatus),
                             borderRadius: BorderRadius.circular(12),
@@ -881,15 +1366,15 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                 ),
                 const SizedBox(height: 6),
                 Obx(() => _buildDetailRow(
-                  Icons.confirmation_number,
-                  'Cart Number',
-                  _cartController.cartNumber.value,
-                )),
+                      Icons.confirmation_number,
+                      'Cart Number',
+                      _cartController.cartNumber.value,
+                    )),
                 Obx(() => _buildDetailRow(
-                  Icons.calendar_today,
-                  'Date',
-                  _cartController.date.value,
-                )),
+                      Icons.calendar_today,
+                      'Date',
+                      _cartController.date.value,
+                    )),
               ],
             ),
           ),
@@ -1028,7 +1513,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
           quantityColumn = 'Quantity';
           inputColumn = 'Accept Qty';
           headerColor = Colors.pink[800]!;
-          controllers = _cartController.acceptQtyControllers;
+          controllers = _acceptQtyControllers;
           break;
         case 'refill':
           products = refillProducts;
@@ -1036,15 +1521,15 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
           quantityColumn = 'Req Qty';
           inputColumn = 'Refill Qty';
           headerColor = Colors.blue[800]!;
-          controllers = _cartController.refillQtyControllers;
+          controllers = _refillQtyControllers;
           break;
         case 'return':
           products = returnProducts;
           headerText = 'Products to Return';
-          quantityColumn = 'Req Qty';
+          quantityColumn = 'Accepted Qty'; // Changed from 'Req Qty'
           inputColumn = 'Return Qty';
           headerColor = Colors.orange[800]!;
-          controllers = _cartController.returnQtyControllers;
+          controllers = _returnQtyControllers;
           break;
         default:
           products = [];
@@ -1073,7 +1558,8 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 12.0, horizontal: 8.0),
                   child: Row(
                     children: [
                       Expanded(
@@ -1120,90 +1606,139 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
               Expanded(
                 child: products.isEmpty
                     ? Center(
-                  child: Text(
-                    'No products available',
-                    style: GoogleFonts.fredoka(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                )
-                    : ListView.builder(
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    final product = products[index];
-                    return Container(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: index < products.length - 1
-                              ? BorderSide(color: Colors.grey[200]!)
-                              : BorderSide.none,
+                        child: Text(
+                          'No products available',
+                          style: GoogleFonts.fredoka(
+                            color: Colors.grey[600],
+                          ),
                         ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 8.0),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: Text(
-                                product.productName,
-                                style: GoogleFonts.fredoka(
-                                  fontSize: 14,
-                                  color: Colors.grey[800],
-                                ),
+                      )
+                    : ListView.builder(
+                        itemCount: products.length,
+                        itemBuilder: (context, index) {
+                          final product = products[index];
+                          final controller = controllers.isNotEmpty &&
+                                  index < controllers.length
+                              ? controllers[index]
+                              : null;
+
+                          final enteredQty =
+                              int.tryParse(controller?.text ?? '0') ?? 0;
+                          final bool showError =
+                              type == 'accept' && enteredQty == 0;
+
+                          // Get maximum allowed quantity for this product type
+                          final maxQuantity =
+                              _getMaxQuantityForProduct(type, product);
+                          final bool showMaxError = enteredQty > maxQuantity;
+
+                          // For return products, show acceptedQuantity instead of quantity
+                          // For return products, show acceptedQuantity instead of quantity
+                          final displayQuantity = type == 'return' && product is ReturnProduct
+                              ? (product.acceptedQuantity ?? product.quantity).toString()
+                              : product.quantity.toString();
+                          return Container(
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: index < products.length - 1
+                                    ? BorderSide(color: Colors.grey[200]!)
+                                    : BorderSide.none,
                               ),
                             ),
-                            Expanded(
-                              flex: 1,
-                              child: Text(
-                                product.quantity.toString(),
-                                style: GoogleFonts.fredoka(
-                                  fontSize: 14,
-                                  color: Colors.grey[800],
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 1,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: headerColor.withOpacity(0.3)),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: TextField(
-                                  controller: controllers.isNotEmpty && index < controllers.length
-                                      ? controllers[index]
-                                      : null,
-                                  decoration: InputDecoration(
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                                    border: InputBorder.none,
-                                    hintText: '0',
-                                    hintStyle: GoogleFonts.fredoka(
-                                      fontSize: 12,
-                                      color: Colors.grey[500],
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 10.0, horizontal: 8.0),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          product.productName,
+                                          style: GoogleFonts.fredoka(
+                                            fontSize: 14,
+                                            color: Colors.grey[800],
+                                          ),
+                                        ),
+                                        if (showMaxError)
+                                          Text(
+                                            'Max: $maxQuantity',
+                                            style: GoogleFonts.fredoka(
+                                              fontSize: 10,
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
-                                  style: GoogleFonts.fredoka(
-                                    fontSize: 14,
-                                    color: Colors.grey[800],
+                                  Expanded(
+                                    flex: 1,
+                                    child: Text(
+                                      displayQuantity,
+                                      style: GoogleFonts.fredoka(
+                                        fontSize: 14,
+                                        color: Colors.grey[800],
+                                      ),
+                                    ),
                                   ),
-                                  textAlign: TextAlign.center,
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (value) {
-                                    final fieldName = type == 'accept'
-                                        ? 'accept_qty'
-                                        : (type == 'refill' ? 'refill_qty' : 'return_qty');
-                                    _cartController.updateProductQuantity(index, fieldName, value, type);
-                                  },
-                                ),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                            color: showError || showMaxError
+                                                ? Colors.red
+                                                : headerColor.withOpacity(0.3)),
+                                        borderRadius: BorderRadius.circular(6),
+                                        color: showError || showMaxError
+                                            ? Colors.red[50]
+                                            : Colors.transparent,
+                                      ),
+                                      child: TextField(
+                                        controller: controller,
+                                        decoration: InputDecoration(
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 4),
+                                          border: InputBorder.none,
+                                          hintText: '0',
+                                          hintStyle: GoogleFonts.fredoka(
+                                            fontSize: 12,
+                                            color: Colors.grey[500],
+                                          ),
+                                          errorText:
+                                              null, // We handle error visually above
+                                        ),
+                                        style: GoogleFonts.fredoka(
+                                          fontSize: 14,
+                                          color: Colors.grey[800],
+                                        ),
+                                        textAlign: TextAlign.center,
+                                        keyboardType: TextInputType.number,
+                                        onChanged: (value) {
+                                          final fieldName = type == 'accept'
+                                              ? 'accept_qty'
+                                              : (type == 'refill'
+                                                  ? 'refill_qty'
+                                                  : 'return_qty');
+                                          _cartController.updateProductQuantity(
+                                              index, fieldName, value, type);
+
+                                          // Trigger UI update for validation
+                                          setState(() {});
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
               ),
             ],
           ),
@@ -1212,43 +1747,129 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
     });
   }
 
-  void _handleAcceptCart() async {
-    try {
-      await _cartController.submitCartAcceptance();
-      Get.snackbar(
-        'Success',
-        'Cart accepted successfully!',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-      _isCartAccepted.value = true;
-
-      // Skip refill section if no refill data
-      if (!hasRefillData) {
-        _isRefillCompleted.value = true;
-      }
-    } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to accept cart: $e',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+// Helper method to get maximum allowed quantity for each product type
+  int _getMaxQuantityForProduct(String type, dynamic product) {
+    switch (type) {
+      case 'accept':
+        // For accept, max is the original quantity
+        return product.quantity;
+      case 'refill':
+        // For refill, max is the original refill quantity
+        return product.quantity;
+      case 'return':
+        // For return, max is the accepted quantity (not original quantity)
+        if (product is ReturnProduct) {
+          return product.acceptedQuantity ?? product.quantity;
+        }
+        return product.quantity;
+      default:
+        return product.quantity;
     }
   }
 
-  void _handleRefillCart() async {
-    try {
-      await _cartController.submitRefillData();
+  void _handleAcceptCart() {
+    if (_validateAcceptCart() && _validateQuantitiesNotExceedingMax('accept')) {
+      _submitAcceptCart();
+    }
+  }
+
+  void _handleRefillCart() {
+    if (_validateRefillCart() && _validateQuantitiesNotExceedingMax('refill')) {
+      _submitRefillCart();
+    }
+  }
+
+  void _handleReturnCart() {
+    if (_validateQuantitiesNotExceedingMax('return')) {
+      _submitReturnCart();
+    }
+  }
+  bool _validateQuantitiesNotExceedingMax(String type) {
+    List<TextEditingController> controllers;
+    List<dynamic> products;
+
+    switch (type) {
+      case 'accept':
+        controllers = _acceptQtyControllers;
+        products = acceptProducts;
+        break;
+      case 'refill':
+        controllers = _refillQtyControllers;
+        products = refillProducts;
+        break;
+      case 'return':
+        controllers = _returnQtyControllers;
+        products = returnProducts;
+        break;
+      default:
+        return true;
+    }
+
+    bool hasExceedingQuantity = false;
+    String firstExceedingProduct = '';
+    int problematicQuantity = 0;
+    bool isNegativeError = false;
+
+    for (int i = 0; i < controllers.length; i++) {
+      final controller = controllers[i];
+      final product = products[i];
+      final enteredQty = int.tryParse(controller.text) ?? 0;
+      final maxQuantity = _getMaxQuantityForProduct(type, product);
+
+      if (enteredQty > maxQuantity) {
+        hasExceedingQuantity = true;
+        firstExceedingProduct = product.productName;
+        problematicQuantity = enteredQty;
+        break; // Stop at first error
+      }
+
+      // Additional check for return: ensure quantity is not negative
+      if (type == 'return' && enteredQty < 0) {
+        hasExceedingQuantity = true;
+        firstExceedingProduct = product.productName;
+        problematicQuantity = enteredQty;
+        isNegativeError = true;
+        break;
+      }
+    }
+
+    if (hasExceedingQuantity) {
+      String errorMessage = isNegativeError
+          ? 'Return quantity cannot be negative for $firstExceedingProduct'
+          : 'Quantity cannot exceed maximum allowed ($problematicQuantity) for $firstExceedingProduct';
+
       Get.snackbar(
+        'Validation Error',
+        errorMessage,
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: Duration(seconds: 3),
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+// Update refill and return methods to match the pattern
+  void _submitRefillCart() async {
+    try {
+      List<int> refillQuantities = [];
+      for (int i = 0; i < _refillQtyControllers.length; i++) {
+        final controller = _refillQtyControllers[i];
+        final enteredQty = int.tryParse(controller.text) ?? 0;
+        refillQuantities.add(enteredQty);
+      }
+
+      await _cartController.submitRefillData(refillQuantities);
+   /*   Get.snackbar(
         'Success',
         'Cart refilled successfully!',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.blue,
         colorText: Colors.white,
-      );
+      );*/
       _isRefillCompleted.value = true;
     } catch (e) {
       Get.snackbar(
@@ -1261,17 +1882,24 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
     }
   }
 
-  void _handleReturnCart() async {
+  void _submitReturnCart() async {
     try {
-      await _cartController.submitReturnData();
-      Get.snackbar(
+      List<int> returnQuantities = [];
+      for (int i = 0; i < _returnQtyControllers.length; i++) {
+        final controller = _returnQtyControllers[i];
+        final enteredQty = int.tryParse(controller.text) ?? 0;
+        returnQuantities.add(enteredQty);
+      }
+
+      await _cartController.submitReturnData(returnQuantities);
+   /*   Get.snackbar(
         'Success',
         'Cart returned successfully!',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.orange,
         colorText: Colors.white,
       );
-
+*/
       // Reset for next cart
       _isCartAccepted.value = false;
       _isRefillCompleted.value = false;
@@ -1289,7 +1917,8 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
     }
   }
 
-  Widget _buildQuantityContainer(String title, String quantity, Color bgColor, Color textColor) {
+  Widget _buildQuantityContainer(
+      String title, String quantity, Color bgColor, Color textColor) {
     return Container(
       decoration: BoxDecoration(
         color: bgColor,
@@ -1361,64 +1990,168 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
 
   Widget _buildDrawer() {
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
+      child: Column(
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              color: Colors.pink[300],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.white,
-                  child: Icon(Icons.person, size: 40, color: Colors.pink[300]),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  'User Profile',
-                  style: GoogleFonts.fredoka(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
+                DrawerHeader(
+                  decoration: BoxDecoration(
+                    color: Colors.pink[300],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      CircleAvatar(
+                        radius: 30,
+                        backgroundColor: Colors.white,
+                        child: userName.value.isNotEmpty
+                            ? Text(
+                          userName.value[0].toUpperCase(),
+                          style: GoogleFonts.fredoka(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.pink[400],
+                          ),
+                        )
+                            : Icon(Icons.person, size: 40, color: Colors.pink[300]),
+                      ),
+                      SizedBox(height: 10),
+
+                      // User Name
+                      Text(
+                        userName.value.isNotEmpty
+                            ? userName.value
+                            : 'User Profile',
+                        style: GoogleFonts.fredoka(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                      // User Email
+                      Text(
+                        userEmail.value.isNotEmpty
+                            ? userEmail.value
+                            : 'user@example.com',
+                        style: GoogleFonts.fredoka(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                      // User Mobile (optional)
+                      if (userMobile.value.isNotEmpty)
+                        Text(
+                          'Mobile: ${userMobile.value}',
+                          style: GoogleFonts.fredoka(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
                   ),
                 ),
-                Text(
-                  'user@example.com',
-                  style: GoogleFonts.fredoka(
-                    color: Colors.white,
-                    fontSize: 14,
+                ListTile(
+                  leading: Icon(Icons.home, color: Colors.pink[300]),
+                  title: Text('Dashboard', style: GoogleFonts.fredoka()),
+                  onTap: () {
+                    Get.back();
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.request_page_outlined, color: Colors.pink[300]),
+                  title: Text(
+                    'View Requests',
+                    style: GoogleFonts.fredoka(),
                   ),
+                  onTap: () {
+                    Get.toNamed('/orders');
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.assignment_return_outlined, color: Colors.pink[300]),
+                  title: Text(
+                    'View Returns',
+                    style: GoogleFonts.fredoka(),
+                  ),
+                  onTap: () {
+                    Get.toNamed('/requests');
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.location_on, color: Colors.pink[300]),
+                  title: Text('Locations', style: GoogleFonts.fredoka()),
+                  onTap: () {
+                    Get.back();
+                    Get.to(() => LocationListScreen());
+                  },
+                ),
+                Divider(),
+                ListTile(
+                  leading: Icon(Icons.logout, color: Colors.pink[300]),
+                  title: Text('Logout', style: GoogleFonts.fredoka()),
+                  onTap: _logout,
                 ),
               ],
             ),
           ),
-          ListTile(
-            leading: Icon(Icons.home, color: Colors.pink[300]),
-            title: Text('Dashboard', style: GoogleFonts.fredoka()),
-            onTap: () {
-              Get.back();
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.location_on, color: Colors.pink[300]),
-            title: Text('Locations', style: GoogleFonts.fredoka()),
-            onTap: () {
-              Get.back();
-              Get.to(() => LocationListScreen());
-            },
-          ),
-          Divider(),
-          ListTile(
-            leading: Icon(Icons.logout, color: Colors.pink[300]),
-            title: Text('Logout', style: GoogleFonts.fredoka()),
-            onTap: _logout,
-          ),
+          // Version info at the absolute bottom
+          _buildVersionInfo(),
         ],
       ),
     );
   }
-}
+
+// Add this method to build version info
+
+// Add this new method to build version info
+  Widget _buildVersionInfo() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text(
+            'App Version',
+            style: GoogleFonts.fredoka(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[600],
+            ),
+          ),
+          SizedBox(width: 4),
+          Text(
+            _getAppVersion(),
+            style: GoogleFonts.fredoka(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.pink[400]!,
+            ),
+          ),
+
+        ],
+      ),
+    );
+  }
+
+// Add these methods to get version info
+  String _getAppVersion() {
+    // You can get this from your pubspec.yaml or use a package
+    // For now, using a hardcoded value - you can replace this with dynamic version
+    return '1.0.5';
+  }
+
+  String _getAppBuildNumber() {
+    // You can get this from your build configuration
+    return '1';
+  }}

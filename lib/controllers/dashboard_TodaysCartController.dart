@@ -108,8 +108,9 @@ class TodaysCartController extends GetxController {
             refillQuantity.value = _calculateRefillQuantity();
             returnQuantity.value = _calculateReturnQuantity();
 
-          } else {
-            errorMessage.value = responseData['msg'] ?? 'Failed to fetch cart details';
+          }  else if (response.status == "failed") {
+            cartData.value = null;
+            errorMessage.value = "Cart is not assigned yet!";
           }
         },
         onFailure: (error) {
@@ -125,7 +126,8 @@ class TodaysCartController extends GetxController {
   }
 
   // ACCEPT CART API CALL
-  Future<void> submitCartAcceptance() async {
+// ACCEPT CART API CALL - Modified to accept values
+  Future<void> submitCartAcceptance(List<int> acceptedQuantities) async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
@@ -138,13 +140,7 @@ class TodaysCartController extends GetxController {
 
       for (int i = 0; i < stockProducts.length; i++) {
         var product = stockProducts[i];
-        String enteredQuantity = acceptQtyControllers[i].text;
-        int acceptedQuantity = enteredQuantity.isEmpty
-            ? product.quantity
-            : int.tryParse(enteredQuantity) ?? product.quantity;
-
-        // Ensure accepted quantity doesn't exceed available quantity
-        acceptedQuantity = acceptedQuantity.clamp(0, product.quantity);
+        int acceptedQuantity = acceptedQuantities[i]; // Use passed value
 
         productList.add({
           'pr_id': product.id,
@@ -210,8 +206,8 @@ class TodaysCartController extends GetxController {
     }
   }
 
-  // REFILL CART API CALL
-  Future<void> submitRefillData() async {
+// REFILL CART API CALL - Modified to accept values
+  Future<void> submitRefillData(List<int> refillQuantities) async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
@@ -224,13 +220,7 @@ class TodaysCartController extends GetxController {
 
       for (int i = 0; i < refillProducts.length; i++) {
         var product = refillProducts[i];
-        String enteredQuantity = refillQtyControllers[i].text;
-        int acceptedQuantity = enteredQuantity.isEmpty
-            ? product.quantity
-            : int.tryParse(enteredQuantity) ?? product.quantity;
-
-        // Ensure accepted quantity doesn't exceed available quantity
-        acceptedQuantity = acceptedQuantity.clamp(0, product.quantity);
+        int acceptedQuantity = refillQuantities[i]; // Use passed value
 
         productList.add({
           'pr_id': product.id,
@@ -249,7 +239,7 @@ class TodaysCartController extends GetxController {
 
       await APIManager().apiRequest(
         Get.context!,
-        API.acceptedCartQuantity, // Same API as accept
+        API.acceptedCartQuantity,
         params: params,
         token: token,
         onSuccess: (response) {
@@ -296,8 +286,8 @@ class TodaysCartController extends GetxController {
     }
   }
 
-  // RETURN CART API CALL
-  Future<void> submitReturnData() async {
+// RETURN CART API CALL - Modified to accept values
+  Future<void> submitReturnData(List<int> returnQuantities) async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
@@ -307,36 +297,23 @@ class TodaysCartController extends GetxController {
 
       // Prepare product list with return quantities
       List<Map<String, dynamic>> productList = [];
-      bool allZero = true;
 
       for (int i = 0; i < returnProducts.length; i++) {
         var product = returnProducts[i];
-        String enteredQuantity = returnQtyControllers[i].text;
-        int returnQuantity = enteredQuantity.isEmpty
-            ? product.quantity
-            : int.tryParse(enteredQuantity) ?? product.quantity;
+        int returnQuantity = returnQuantities[i]; // Use passed value
 
         // Ensure return quantity doesn't exceed available quantity
         returnQuantity = returnQuantity.clamp(0, product.quantity);
-
-        // Check if at least one product has non-zero quantity
-        if (returnQuantity > 0) {
-          allZero = false;
-        }
 
         productList.add({
           'pr_id': product.id,
           'product_id': product.productId,
           'quantity': product.quantity,
-          'accepted_quantity': returnQuantity // Using accepted_quantity field for return
+          'accepted_quantity': returnQuantity // This can be 0
         });
       }
 
-      // If all return quantities are 0, send empty product list
-      if (allZero) {
-        productList = [];
-      }
-
+      // Always send the product list, even if all quantities are 0
       final params = {
         'cart_req_id': cart.id.toString(),
         'product_list': json.encode(productList),

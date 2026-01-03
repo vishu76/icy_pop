@@ -51,12 +51,12 @@ class OrderListScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(8),
                 margin: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.orange[100],
+                  color:Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
                   children: [
-                    Row(
+                 /*   Row(
                       children: [
                         const Icon(Icons.info_outline, color: Colors.orange),
                         const SizedBox(width: 8),
@@ -67,7 +67,7 @@ class OrderListScreen extends StatelessWidget {
                           ),
                         ),
                       ],
-                    ),
+                    ),*/
                     if (_controller.tokenExpired.value)
                       Container(
                         margin: const EdgeInsets.only(top: 10),
