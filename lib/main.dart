@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:developer';
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:ice_cream/services/LocationMonitor.dart';
 import 'package:ice_cream/services/api_manager.dart';
 import 'package:ice_cream/services/auth_service.dart';
 import 'package:ice_cream/services/background_callback.dart';
+import 'package:ice_cream/services/driver_location_service.dart';
 import 'package:ice_cream/views/Selfie_Capture_Page.dart';
 
 import 'package:ice_cream/views/login_page.dart';
@@ -18,35 +21,47 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
 
-// Updated LocationMonitor class to check BOTH permission and service
-
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   try {
     // Initialize shared preferences
     final sharedPreferences = await SharedPreferences.getInstance();
-
     // Register services
     Get.put(sharedPreferences);
     Get.put(ApiManager());
     await Get.putAsync(() => AuthService().init());
+    FlutterForegroundTask.init(
+      androidNotificationOptions: AndroidNotificationOptions(
+        channelId: 'driver_tracking',
+        channelName: 'Working Tracking',
+        channelDescription: 'Tracks driver location',
+        channelImportance: NotificationChannelImportance.HIGH,
+        priority: NotificationPriority.HIGH,
+      ),
+      foregroundTaskOptions: ForegroundTaskOptions(
+        autoRunOnBoot: true,
+        allowWakeLock: true,
+        // eventAction: ForegroundTaskEventAction.repeat(60000),
+        eventAction: ForegroundTaskEventAction.nothing(),
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(
+        showNotification: true,
+        playSound: false,
+      ),
+    );
+    await Geolocator.requestPermission();
 
     // Initialize Workmanager
-    Workmanager().initialize(
-      callbackDispatcher,
-      isInDebugMode: true,
-    );
-
+    // Workmanager().initialize(
+    //   callbackDispatcher,
+    //   isInDebugMode: true,
+    // );
 
     // Start location monitoring (checks both permission and service)
-    print('Starting location monitoring...');
-    LocationMonitor().startMonitoring();
-
-    const frequency = Duration(seconds: 5);
-
-    Workmanager().registerPeriodicTask(
+    // print('Starting location monitoring...');
+    // LocationMonitor().startMonitoring();
+    // const frequency = Duration(seconds: 5);
+/*    Workmanager().registerPeriodicTask(
       "uniqueTaskName",
       "fetchLocationTask",
       frequency: frequency,
@@ -61,8 +76,7 @@ void main() async {
       log("✅ Periodic task registered");
     }).catchError((e) {
       log("❌ Failed to register periodic task: $e");
-    });
-
+    });*/
     runApp(const MyApp());
   } catch (e, stackTrace) {
     log("🔥 Fatal error during initialization: $e");

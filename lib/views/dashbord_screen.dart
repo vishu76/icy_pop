@@ -32,7 +32,7 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _printAuthToken();
     fetchOrderDetail();
-    _dashboardController.startLocationTracking();
+    // _dashboardController.startLocationTracking();
   }
 
   Future<void> _printAuthToken() async {

@@ -18,6 +18,9 @@ import '../models/CartDataModel.dart';
 import '../services/api_manager.dart';
 import '../services/api_services.dart';
 import '../services/auth_service.dart';
+import '../services/driver_location_service.dart';
+import '../services/foreground_task_handler.dart';
+import '../utils/driver_state.dart';
 import '../utils/token_expiry_dialog.dart';
 import 'loction_list_screen.dart';
 
@@ -47,14 +50,18 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
   final RxString userEmail = ''.obs;
   final RxString userMobile = ''.obs;
   final RxString userId = ''.obs;
+
+  final DriverLocationService locationService = DriverLocationService();
+
+
   @override
   void initState() {
     super.initState();
 
     // Initialize controllers safely
     _initializeControllers();
-    _dashboardController.startLocationTracking();
-   // _printAuthToken();
+    // _dashboardController.startLocationTracking();
+    // _printAuthToken();
     fetchOrderDetail();
 
     loadUserData();
@@ -75,6 +82,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
       print('❌ Error loading user data: $e');
     }
   }
+
   Future<void> clearUserData() async {
     try {
       final prefs = Get.find<SharedPreferences>();
@@ -263,62 +271,61 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
   Future<void> _logout() async {
     // Show confirmation dialog
     final bool shouldLogout = await Get.dialog<bool>(
-      AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        title: Text(
-          'Logout Confirmation',
-          style: GoogleFonts.fredoka(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Are you sure you want to logout?',
+          AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Text(
+              'Logout Confirmation',
               style: GoogleFonts.fredoka(
-                fontSize: 16,
-                color: Colors.grey[700],
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
               ),
             ),
-
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.fredoka(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Are you sure you want to logout?',
+                  style: GoogleFonts.fredoka(
+                    fontSize: 16,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.fredoka(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Get.back(result: true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pink[400],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  'Logout',
+                  style: GoogleFonts.fredoka(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
           ),
-
-          ElevatedButton(
-            onPressed: () => Get.back(result: true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.pink[400],
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              'Logout',
-              style: GoogleFonts.fredoka(
-                fontSize: 16,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
 
     if (!shouldLogout) {
       return; // User cancelled
@@ -632,7 +639,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
         acceptedQuantities.add(enteredQty);
       }
       await _cartController.submitCartAcceptance(acceptedQuantities);
-  /*    Get.snackbar(
+      /*    Get.snackbar(
         'Success',
         'Cart accepted successfully!',
         snackPosition: SnackPosition.BOTTOM,
@@ -793,17 +800,13 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-
                   // Quantity Summary Row
                   _buildQuantitySummary(),
-
                   const SizedBox(height: 14),
 
                   // Cart Details Card
                   _buildCartDetails(),
-
                   const SizedBox(height: 14),
-
                   // Main Content Section
                   Obx(() {
                     // Show loading or error states
@@ -854,8 +857,37 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                       }
                     }
                   }),
-
+                  //testing location
+                  // ElevatedButton(
+                  //   child: const Text('GO ONLINE'),
+                  //   onPressed: () async {
+                  //     // await locationService.startForegroundService();
+                  //     // await locationService.setState(DriverState.onlineIdle);
+                  //   },
+                  // ),
+                  ElevatedButton(
+                    child: const Text('START TRIP'),
+                    onPressed: () async {
+                      // await locationService.setState(DriverState.onTrip);
+                      await LocationTaskHandler().startDriverTracking();
+                    },
+                  ),/**/
+                  ElevatedButton(
+                    child: const Text('END TRIP'),
+                    onPressed: () async {
+                      // await locationService.setState(DriverState.onlineIdle);
+                      await LocationTaskHandler().stopDriverTracking();
+                    },
+                  ),
+                  // ElevatedButton(
+                  //   child: const Text('GO OFFLINE'),
+                  //   onPressed: () async {
+                  //     // await locationService.dispose();
+                  //     // await locationService.stopForegroundService();
+                  //   },
+                  // ),
                   const SizedBox(height: 80),
+
                 ],
               ),
             ),
@@ -876,6 +908,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
               child: _buildFloatingButton(),
             );
           }),
+
         ],
       ),
     );
@@ -945,7 +978,8 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                           _validateQuantitiesNotExceedingMax('accept');
                     } else if (!_isRefillCompleted.value && hasRefillData) {
                       validationType = 'refill';
-                      canProceed = _validateRefillCart() && _validateQuantitiesNotExceedingMax('refill');
+                      canProceed = _validateRefillCart() &&
+                          _validateQuantitiesNotExceedingMax('refill');
                     } else {
                       validationType = 'return';
                       canProceed = _validateQuantitiesNotExceedingMax('return');
@@ -1091,7 +1125,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                             color: Colors.green[800],
                           ),
                         ),
-                     /*   SizedBox(height: 4),
+                        /*   SizedBox(height: 4),
                         Text(
                           'All operations completed',
                           style: GoogleFonts.fredoka(
@@ -1634,8 +1668,10 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
 
                           // For return products, show acceptedQuantity instead of quantity
                           // For return products, show acceptedQuantity instead of quantity
-                          final displayQuantity = type == 'return' && product is ReturnProduct
-                              ? (product.acceptedQuantity ?? product.quantity).toString()
+                          final displayQuantity = type == 'return' &&
+                                  product is ReturnProduct
+                              ? (product.acceptedQuantity ?? product.quantity)
+                                  .toString()
                               : product.quantity.toString();
                           return Container(
                             decoration: BoxDecoration(
@@ -1784,6 +1820,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
       _submitReturnCart();
     }
   }
+
   bool _validateQuantitiesNotExceedingMax(String type) {
     List<TextEditingController> controllers;
     List<dynamic> products;
@@ -1863,7 +1900,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
       }
 
       await _cartController.submitRefillData(refillQuantities);
-   /*   Get.snackbar(
+      /*   Get.snackbar(
         'Success',
         'Cart refilled successfully!',
         snackPosition: SnackPosition.BOTTOM,
@@ -1892,7 +1929,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
       }
 
       await _cartController.submitReturnData(returnQuantities);
-   /*   Get.snackbar(
+      /*   Get.snackbar(
         'Success',
         'Cart returned successfully!',
         snackPosition: SnackPosition.BOTTOM,
@@ -1996,13 +2033,14 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                DrawerHeader(
+                /* DrawerHeader(
                   decoration: BoxDecoration(
                     color: Colors.pink[300],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.max,
                     children: [
                       CircleAvatar(
                         radius: 30,
@@ -2019,7 +2057,6 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                             : Icon(Icons.person, size: 40, color: Colors.pink[300]),
                       ),
                       SizedBox(height: 10),
-
                       // User Name
                       Text(
                         userName.value.isNotEmpty
@@ -2033,7 +2070,6 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-
                       // User Email
                       Text(
                         userEmail.value.isNotEmpty
@@ -2046,7 +2082,6 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-
                       // User Mobile (optional)
                       if (userMobile.value.isNotEmpty)
                         Text(
@@ -2060,6 +2095,81 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                         ),
                     ],
                   ),
+                ),*/
+                DrawerHeader(
+                  decoration: BoxDecoration(
+                    color: Colors.pink[300],
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              CircleAvatar(
+                                radius: 30,
+                                backgroundColor: Colors.white,
+                                child: userName.value.isNotEmpty
+                                    ? Text(
+                                        userName.value[0].toUpperCase(),
+                                        style: GoogleFonts.fredoka(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.pink[400],
+                                        ),
+                                      )
+                                    : Icon(Icons.person,
+                                        size: 40, color: Colors.pink[300]),
+                              ),
+                              SizedBox(height: 10),
+                              // User Name
+                              Text(
+                                userName.value.isNotEmpty
+                                    ? userName.value
+                                    : 'User Profile',
+                                style: GoogleFonts.fredoka(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              // User Email
+                              Text(
+                                userEmail.value.isNotEmpty
+                                    ? userEmail.value
+                                    : 'user@example.com',
+                                style: GoogleFonts.fredoka(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 14,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              // User Mobile (optional)
+                              if (userMobile.value.isNotEmpty)
+                                Text(
+                                  'Mobile: ${userMobile.value}',
+                                  style: GoogleFonts.fredoka(
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontSize: 12,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              SizedBox(height: 10),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
                 ListTile(
                   leading: Icon(Icons.home, color: Colors.pink[300]),
@@ -2069,7 +2179,8 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                   },
                 ),
                 ListTile(
-                  leading: Icon(Icons.request_page_outlined, color: Colors.pink[300]),
+                  leading: Icon(Icons.request_page_outlined,
+                      color: Colors.pink[300]),
                   title: Text(
                     'View Requests',
                     style: GoogleFonts.fredoka(),
@@ -2079,7 +2190,8 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                   },
                 ),
                 ListTile(
-                  leading: Icon(Icons.assignment_return_outlined, color: Colors.pink[300]),
+                  leading: Icon(Icons.assignment_return_outlined,
+                      color: Colors.pink[300]),
                   title: Text(
                     'View Returns',
                     style: GoogleFonts.fredoka(),
@@ -2119,7 +2231,7 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
-mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
           Text(
             'App Version',
@@ -2138,7 +2250,6 @@ mainAxisAlignment: MainAxisAlignment.end,
               color: Colors.pink[400]!,
             ),
           ),
-
         ],
       ),
     );
@@ -2154,4 +2265,5 @@ mainAxisAlignment: MainAxisAlignment.end,
   String _getAppBuildNumber() {
     // You can get this from your build configuration
     return '1';
-  }}
+  }
+}

@@ -12,13 +12,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 class DashboardController extends GetxController {
   var selectedDate = DateTime.now().subtract(Duration(days: 1)).obs;
   final Map<DateTime, List<int>> salesData = {};
-  final LocationService _locationService = LocationService();
+  // final LocationService _locationService = LocationService();
   var dashboardData = <Map<String, dynamic>>[].obs;
   RxList<Map<String, dynamic>> rawProductSales = <Map<String, dynamic>>[].obs;
   final Rx<DateTime> fromDate = DateTime.now().obs;
   final Rx<DateTime> toDate = DateTime.now().obs;
-
-  Timer? _backgroundTaskTimer;
+  // Timer? _backgroundTaskTimer;
 
   @override
   void onInit() {
@@ -28,7 +27,7 @@ class DashboardController extends GetxController {
 
   @override
   void onClose() {
-    _backgroundTaskTimer?.cancel();
+    // _backgroundTaskTimer?.cancel();
     super.onClose();
   }
 
@@ -81,7 +80,7 @@ class DashboardController extends GetxController {
     return normSelected;
   }
 
-  Future<void> _initializeWorkManager() async {
+/*  Future<void> _initializeWorkManager() async {
     try {
       // Cancel any existing tasks first
       await Workmanager().cancelAll();
@@ -95,7 +94,7 @@ class DashboardController extends GetxController {
       log('✅ WorkManager initialized successfully');
 
       // Register the periodic task
-      await Workmanager().registerPeriodicTask(
+*//*      await Workmanager().registerPeriodicTask(
         "locationTask",
         "fetchLocationTask",
         frequency: Duration(minutes: 1),
@@ -108,7 +107,7 @@ class DashboardController extends GetxController {
           requiresStorageNotLow: false,
         ),
         existingWorkPolicy: ExistingWorkPolicy.replace,
-      );
+      );*//*
 
       log('✅ Periodic task registered (every 1 minute)');
 
@@ -116,9 +115,9 @@ class DashboardController extends GetxController {
       log('❌ Error initializing WorkManager: $e');
       log('Stack trace: $stack');
     }
-  }
+  }*/
 
-  void startLocationTracking() {
+/*  void startLocationTracking() {
     log('🔄 Starting location tracking...');
 
     // Start WorkManager for background tasks
@@ -166,5 +165,6 @@ class DashboardController extends GetxController {
     _backgroundTaskTimer?.cancel();
     Workmanager().cancelAll();
     log('🛑 Location tracking stopped');
-  }
+  }*/
+
 }
