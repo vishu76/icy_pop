@@ -7,14 +7,16 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:ice_cream/services/database.dart';
-import 'package:intl/intl.dart';
+ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:http/http.dart' as http;
+import '../utils/token_expiry_dialog.dart';
 import 'api_manager.dart';
 import 'background_api_manager.dart';
 import 'foreground_task_handler.dart';
 import 'location_service.dart';
+import 'notification_helper.dart';
 
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
@@ -87,14 +89,12 @@ Future<void> sendLocationToAPI({
     // final _apiManager = Get.find<ApiManager>();
     final _apiManager = BackgroundApiManager(); // direct instance
     final token = await _apiManager.getToken();
-    print('Token for location: $token');
-    if (token == null || token.isEmpty) {
-      log('No authentication token available');
-      return;
-    }
-
-    log('🔹 Using token: ${token.substring(0, 10)}...');
-
+    // print('Token for location: $token');
+    // if (token == null || token.isEmpty) {
+    //   log('No authentication token available');
+    //   return;
+    // }
+    // log('🔹 Using token: ${token.substring(0, 10)}...');
     // 2. Prepare the request
     final url = Uri.parse("https://uatadmin.icypopps.com/api/wheelcartmaster/add-wheel-cart-location");
     var request = http.MultipartRequest('POST', url);
@@ -115,26 +115,67 @@ Future<void> sendLocationToAPI({
     // 5. Send request
     final response = await request.send();
     final responseBody = await response.stream.bytesToString();
+    final decoded = jsonDecode(responseBody);
+    // final status = decoded['status'];
+    final n = decoded['n'];
+    final msg = decoded['msg'] ?? '';
     if (kDebugMode) {
       print('Status Code: ${response.statusCode}');
     }
-    final decoded = jsonDecode(responseBody);
-//  BACKEND-CONTROLLED FAILURE
-    if (decoded['status'] == 'success') {
-      print('Location sent successfully: $responseBody');
-    }else{
-     // if(decoded['n']== 2){
-     //   print('Stop Tracking');
-     //   // await LocationTaskHandler().stopDriverTracking();
-     //  }
-      await LocationTaskHandler().stopDriverTracking();
-      print(' Code: ${response.statusCode} Token might be expired or invalid: $responseBody');
+    if(response.statusCode == 200){
+      // success
+      if (kDebugMode) {
+        print('Location sent successfully: $responseBody');
+      }
+      if (n == 1) {
+        if (kDebugMode) {
+          print('Vishu Driver Tracking');
+        }
+       }else if (n == 2) {
+        if (kDebugMode) {
+          print('Vishu Stop Tracking');
+        }
+        // STOP FOREGROUND SERVICE HERE
+        if (await FlutterForegroundTask.isRunningService) {
+          await FlutterForegroundTask.stopService();
+        }
+        await showStopTrackingNotification(
+          '$msg',
+        );
+      } else {
+        if (kDebugMode) {
+          print('Vishu Success with unexpected n: $n');
+        }
+      }
+    }else if(response.statusCode == 401){
       // final prefs = await SharedPreferences.getInstance();
       // await prefs.remove('auth_token');
-      final msg = decoded['msg'] ?? '';
+      // field
+      if (kDebugMode) {
+        print('API Failed: $msg');
+      }
+      if (await FlutterForegroundTask.isRunningService) {
+        await FlutterForegroundTask.stopService();
+      }
+      await showStopTrackingNotification(
+        '$msg',
+      );
+    }else{
+      // another
+      if (kDebugMode) {
+        print(' Unknown status: $response.statusCode');
+      }
+      if (await FlutterForegroundTask.isRunningService) {
+        await FlutterForegroundTask.stopService();
+      }
+      await showStopTrackingNotification(
+         'Tracking stopped. Unknown Status: ${response.statusCode}',
+      );
     }
   } catch (e, stack) {
-    print('Exception in sendLocationToAPI: $e');
+    if (kDebugMode) {
+      print('Exception in sendLocationToAPI: $e');
+    }
   }
 
 

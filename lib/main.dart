@@ -30,6 +30,7 @@ void main() async {
     Get.put(sharedPreferences);
     Get.put(ApiManager());
     await Get.putAsync(() => AuthService().init());
+    await Geolocator.requestPermission();
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'driver_tracking',
@@ -41,15 +42,14 @@ void main() async {
       foregroundTaskOptions: ForegroundTaskOptions(
         autoRunOnBoot: true,
         allowWakeLock: true,
-        // eventAction: ForegroundTaskEventAction.repeat(60000),
-        eventAction: ForegroundTaskEventAction.nothing(),
+        eventAction: ForegroundTaskEventAction.repeat(60000),
+        // eventAction: ForegroundTaskEventAction.nothing(),
       ),
       iosNotificationOptions: const IOSNotificationOptions(
         showNotification: true,
         playSound: false,
       ),
     );
-    await Geolocator.requestPermission();
 
     // Initialize Workmanager
     // Workmanager().initialize(

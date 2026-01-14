@@ -1,27 +1,23 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:developer';
-
-import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 import 'package:custom_refresh_indicator/custom_refresh_indicator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ice_cream/utils/color.dart';
 import 'package:ice_cream/views/login_page.dart';
-import 'package:intl/intl.dart';
+import 'package:ice_cream/views/tripControlButton.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_constants.dart';
 import '../controllers/dashboard_TodaysCartController.dart';
 import '../controllers/dashbord_controller.dart';
+import '../controllers/driver_tracking_controller.dart';
 import '../models/CartDataModel.dart';
 import '../services/api_manager.dart';
-import '../services/api_services.dart';
 import '../services/auth_service.dart';
 import '../services/driver_location_service.dart';
 import '../services/foreground_task_handler.dart';
-import '../utils/driver_state.dart';
-import '../utils/token_expiry_dialog.dart';
+import '../services/location_permission_manager.dart';
 import 'loction_list_screen.dart';
 
 class NewDashbordScreen extends StatefulWidget {
@@ -53,7 +49,6 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
 
   final DriverLocationService locationService = DriverLocationService();
 
-
   @override
   void initState() {
     super.initState();
@@ -67,6 +62,8 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
     loadUserData();
     // Start auto-refresh timer
     _startAutoRefresh();
+    // Start Tracking
+    // DriverTrackingController.instance.startTracking();
   }
 
   Future<void> loadUserData() async {
@@ -865,20 +862,24 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                   //     // await locationService.setState(DriverState.onlineIdle);
                   //   },
                   // ),
+                  TripControlButton(),
+                /*  SizedBox(height: 20,),
                   ElevatedButton(
                     child: const Text('START TRIP'),
                     onPressed: () async {
                       // await locationService.setState(DriverState.onTrip);
+                      final ready = await LocationPermissionManager.instance.ensureLocationReady();
+                      if (!ready) return;
                       await LocationTaskHandler().startDriverTracking();
                     },
-                  ),/**/
+                  ),
                   ElevatedButton(
                     child: const Text('END TRIP'),
                     onPressed: () async {
                       // await locationService.setState(DriverState.onlineIdle);
                       await LocationTaskHandler().stopDriverTracking();
                     },
-                  ),
+                  ),*/
                   // ElevatedButton(
                   //   child: const Text('GO OFFLINE'),
                   //   onPressed: () async {
@@ -887,7 +888,6 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                   //   },
                   // ),
                   const SizedBox(height: 80),
-
                 ],
               ),
             ),
@@ -908,7 +908,6 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
               child: _buildFloatingButton(),
             );
           }),
-
         ],
       ),
     );

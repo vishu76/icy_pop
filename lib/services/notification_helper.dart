@@ -7,8 +7,8 @@ Future<void> showStopTrackingNotification(String message) async {
     'tracking_alerts',
     'Tracking Alerts',
     channelDescription: 'Driver tracking alerts',
-    importance: Importance.low,
-    priority: Priority.low,
+    importance: Importance.high,
+    priority: Priority.high,
     icon: '@drawable/ic_notification',
   );
 

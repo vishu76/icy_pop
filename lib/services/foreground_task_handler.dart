@@ -46,7 +46,7 @@ class LocationTaskHandler extends TaskHandler {
         longitude: position.longitude,
       );
     },onError: (error) async {
-      // 🔥 HANDLE GPS OFF / ERROR
+      // HANDLE GPS OFF / ERROR
       print("start tracking Error: $error");
       final enabled = await Geolocator.isLocationServiceEnabled();
       if (!enabled) {
