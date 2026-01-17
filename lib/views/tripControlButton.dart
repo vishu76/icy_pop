@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../controllers/driver_tracking_controller.dart';
 import '../services/location_permission_manager.dart';
@@ -48,7 +49,7 @@ class _TripControlButtonState extends State<TripControlButton> with WidgetsBindi
       // START TRIP
       final ready = await LocationPermissionManager.instance.ensureLocationReady();
       if (!ready) return;
-      await DriverTrackingController.instance.startTracking();
+        await DriverTrackingController.instance.startTracking();
     }
     await _loadState(); // refresh UI
   }

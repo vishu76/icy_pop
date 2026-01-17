@@ -863,13 +863,13 @@ class _NewDashbordScreenState extends State<NewDashbordScreen> {
                   //   },
                   // ),
                   TripControlButton(),
-                /*  SizedBox(height: 20,),
-                  ElevatedButton(
+                  // SizedBox(height: 20,),
+               /*   ElevatedButton(
                     child: const Text('START TRIP'),
                     onPressed: () async {
                       // await locationService.setState(DriverState.onTrip);
-                      final ready = await LocationPermissionManager.instance.ensureLocationReady();
-                      if (!ready) return;
+                      // final ready = await LocationPermissionManager.instance.ensureLocationReady();
+                      // if (!ready) return;
                       await LocationTaskHandler().startDriverTracking();
                     },
                   ),

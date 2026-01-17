@@ -13,12 +13,8 @@ class LocationPermissionManager {
   LocationPermissionManager._internal();
 
   bool _dialogVisible = false;
-
-  /// Call this when:
-  /// - App starts
-  /// - Driver taps "Go Online"
   Future<bool> ensureLocationReady() async {
-    // 1️⃣ Permission check
+    //Permission check
     final permission = await Geolocator.checkPermission();
 
     if (permission == LocationPermission.denied) {
@@ -35,7 +31,7 @@ class LocationPermissionManager {
       return false;
     }
 
-    // 2️⃣ GPS service check
+    //GPS service check
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       _showGpsDialog();

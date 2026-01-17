@@ -18,7 +18,7 @@ import 'foreground_task_handler.dart';
 import 'location_service.dart';
 import 'notification_helper.dart';
 
-void callbackDispatcher() {
+/*void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     final startTime = DateTime.now();
     log('⚡ [${startTime.toIso8601String()}] Task STARTED: $task');
@@ -76,7 +76,7 @@ void callbackDispatcher() {
 
     return Future.value(true);
   });
-}
+}*/
 
 Future<void> sendLocationToAPI({
   required String cartUserId,

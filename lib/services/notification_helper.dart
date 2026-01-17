@@ -13,7 +13,6 @@ Future<void> showStopTrackingNotification(String message) async {
   );
 
   const details = NotificationDetails(android: androidDetails);
-
   await _notifications.show(
     1001,
     'Tracking Stopped',

@@ -1,14 +1,12 @@
 import 'dart:async';
 import 'dart:developer';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
-import 'package:ice_cream/services/LocationMonitor.dart';
 import 'package:ice_cream/services/api_manager.dart';
 import 'package:ice_cream/services/auth_service.dart';
-import 'package:ice_cream/services/background_callback.dart';
-import 'package:ice_cream/services/driver_location_service.dart';
 import 'package:ice_cream/views/Selfie_Capture_Page.dart';
 
 import 'package:ice_cream/views/login_page.dart';
@@ -18,8 +16,6 @@ import 'package:ice_cream/views/request_list_screen.dart';
 import 'package:ice_cream/views/sell_page.dart';
 import 'package:ice_cream/views/splash_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:workmanager/workmanager.dart';
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,7 +26,7 @@ void main() async {
     Get.put(sharedPreferences);
     Get.put(ApiManager());
     await Get.putAsync(() => AuthService().init());
-    await Geolocator.requestPermission();
+   /* await Geolocator.requestPermission();
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'driver_tracking',
@@ -39,6 +35,7 @@ void main() async {
         channelImportance: NotificationChannelImportance.HIGH,
         priority: NotificationPriority.HIGH,
       ),
+
       foregroundTaskOptions: ForegroundTaskOptions(
         autoRunOnBoot: true,
         allowWakeLock: true,
@@ -49,35 +46,15 @@ void main() async {
         showNotification: true,
         playSound: false,
       ),
-    );
 
-    // Initialize Workmanager
-    // Workmanager().initialize(
-    //   callbackDispatcher,
-    //   isInDebugMode: true,
-    // );
-
-    // Start location monitoring (checks both permission and service)
-    // print('Starting location monitoring...');
-    // LocationMonitor().startMonitoring();
-    // const frequency = Duration(seconds: 5);
-/*    Workmanager().registerPeriodicTask(
-      "uniqueTaskName",
-      "fetchLocationTask",
-      frequency: frequency,
-      constraints: Constraints(
-        networkType: NetworkType.connected,
-      ),
-      existingWorkPolicy: ExistingWorkPolicy.replace,
-      initialDelay: const Duration(seconds: 3),
-      backoffPolicy: BackoffPolicy.exponential,
-      backoffPolicyDelay: Duration(minutes: 5),
-    ).then((value) {
-      log("✅ Periodic task registered");
-    }).catchError((e) {
-      log("❌ Failed to register periodic task: $e");
-    });*/
-    runApp(const MyApp());
+    );*/
+    // FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Request permissions and initialize the service.
+      _requestPermissions();
+      _initService();
+    });
+     runApp(const MyApp());
   } catch (e, stackTrace) {
     log("🔥 Fatal error during initialization: $e");
     log("Stack trace: $stackTrace");
@@ -89,7 +66,54 @@ void main() async {
     ));
   }
 }
+Future<void> _requestPermissions() async {
+  // Android 13+, you need to allow notification permission to display foreground service notification.
+  // iOS: If you need notification, ask for permission.
+  final NotificationPermission notificationPermission = await FlutterForegroundTask.checkNotificationPermission();
+  if (notificationPermission != NotificationPermission.granted) {
+    await FlutterForegroundTask.requestNotificationPermission();
+  }
+  if (Platform.isAndroid) {
+    // Android 12+, there are restrictions on starting a foreground service.
+    // To restart the service on device reboot or unexpected problem, you need to allow below permission.
+    if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
+      // This function requires `android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` permission.
+      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+    }
+   /* // Use this utility only if you provide services that require long-term survival,
+    // such as exact alarm service, healthcare service, or Bluetooth communication.
+    // This utility requires the "android.permission.SCHEDULE_EXACT_ALARM" permission.
+    // Using this permission may make app distribution difficult due to Google policy.
+    if (!await FlutterForegroundTask.canScheduleExactAlarms) {
+      // When you call this function, will be gone to the settings page.
+      // So you need to explain to the user why set it.
+      await FlutterForegroundTask.openAlarmsAndRemindersSettings();
+    }*/
+  }
+}
 
+void _initService() {
+  FlutterForegroundTask.init(
+    androidNotificationOptions: AndroidNotificationOptions(
+      channelId: 'foreground_service',
+      channelName: 'Foreground Service Notification',
+      channelDescription: 'This notification appears when the foreground service is running.',
+      onlyAlertOnce: true,
+    ),
+    iosNotificationOptions: const IOSNotificationOptions(
+      showNotification: false,
+      playSound: false,
+    ),
+    foregroundTaskOptions: ForegroundTaskOptions(
+      // eventAction: ForegroundTaskEventAction.repeat(5000),
+      eventAction: ForegroundTaskEventAction.nothing(),
+      autoRunOnBoot: true,
+      autoRunOnMyPackageReplaced: true,
+      allowWakeLock: true,
+      allowWifiLock: true,
+    ),
+  );
+}
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
